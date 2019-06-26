@@ -1312,7 +1312,7 @@ struct to_ir {
 
       // if the FOR iters and targets are present, emit FOR target assignments
       if (iter_val != nullptr && targets) {
-        Value* cur_elem = iter_val->getelem(range, method, trip_count);
+        Value* cur_elem = iter_val->getitem(range, method, trip_count);
         SugaredValuePtr sv = std::make_shared<SimpleValue>(cur_elem);
         List<Expr> target_exprs = targets.value();
         validateAssignLhsExpr(target_exprs, range);
@@ -1651,7 +1651,7 @@ struct to_ir {
           NamedValue(stmt.rhs().range(), "value", emitExpr(stmt.rhs()));
 
       const auto getItem =
-          graph->insert(aten::select, {listArg, idxArg}, {}, stmt.range());
+          graph->insert(aten::__getitem__, {listArg, idxArg}, {}, stmt.range());
       const auto augmentedItem = graph->insert(
           getAugOp(stmt, elementType), {getItem, valueArg}, {}, stmt.range());
       graph->insert(
@@ -2895,7 +2895,13 @@ struct to_ir {
       // if it's a list, emit a regular index selection op
       auto* idx = emitExpr(subscript_exprs[0]);
       return emitBuiltinCall(
-          loc, *graph, aten::select, c10::nullopt, {gatherable, idx}, {}, true);
+          loc,
+          *graph,
+          aten::__getitem__,
+          c10::nullopt,
+          {gatherable, idx},
+          {},
+          true);
     } else if (gatherable->type()->isSubtypeOf(TensorType::get())) {
       return emitMultidimSlicing(loc, gatherable, subscript_exprs);
     } else if (auto tuple_type = gatherable->type()->cast<TupleType>()) {
@@ -2909,7 +2915,7 @@ struct to_ir {
       return emitBuiltinCall(
           loc,
           *graph,
-          prim::StringIndex,
+          aten::__getitem__,
           c10::nullopt,
           {gatherable, idx},
           {},

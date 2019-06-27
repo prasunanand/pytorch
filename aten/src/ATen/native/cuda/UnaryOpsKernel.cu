@@ -1,3 +1,4 @@
+#include <limits>
 #include <ATen/native/UnaryOps.h>
 #include <ATen/native/cuda/Loops.cuh>
 #include <ATen/Context.h>
@@ -5,9 +6,30 @@
 #include <ATen/native/cuda/Loops.cuh>
 #include <ATen/native/DispatchStub.h>
 #include <ATen/native/TensorIterator.h>
-#include <limits>
 
 namespace at { namespace native {
+
+void bitwise_not_kernel_cuda_impl(TensorIterator& iter) {
+  if (iter.dtype() == ScalarType::Bool) {
+    gpu_kernel(iter, []GPU_LAMBDA(bool a) {
+      return !a;
+    });
+  } else {
+    AT_DISPATCH_INTEGRAL_TYPES(iter.dtype(), "bitwise_cuda", [&]() {
+      gpu_kernel(iter, []GPU_LAMBDA(scalar_t a) -> scalar_t {
+        return ~a;
+      });
+    });
+  }
+}
+
+static void bitwise_not_kernel_cuda(TensorIterator& iter) {
+  // Wrap the implementation to a non-static function, otherwise will have the following build error on Windows:
+  //
+  //    On Windows, the enclosing parent function ("bitwise_not_kernel_cuda") for an extended __host__ __device__ lambda
+  //    cannot have internal or no linkage
+  bitwise_not_kernel_cuda_impl(iter);
+}
 
 template <typename scalar_t>
 void fill_kernel_impl(TensorIterator& iter, Scalar value_scalar) {
@@ -24,5 +46,6 @@ static void fill_kernel_cuda(TensorIterator& iter, Scalar value) {
 }
 
 REGISTER_DISPATCH(fill_stub, &fill_kernel_cuda);
+REGISTER_DISPATCH(bitwise_not_stub, &bitwise_not_kernel_cuda);
 
 }}

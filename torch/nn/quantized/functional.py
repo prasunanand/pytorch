@@ -22,8 +22,7 @@ def conv2d(input, weight, bias,
            stride=1, padding=0, dilation=1, groups=1,
            padding_mode='zeros',
            scale=1.0, zero_point=0,
-           dtype=torch.quint8,
-           prepacked=True) -> Tensor
+           dtype=torch.quint8) -> Tensor
 
     Applies a 2D convolution over a quantized 2D input composed of several input
     planes.

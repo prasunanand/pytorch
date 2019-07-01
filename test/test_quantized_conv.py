@@ -25,9 +25,8 @@ class FunctionalAPITest(TestCase):
                            max_groups=4),
            padH=st.integers(1, 3), padW=st.integers(1, 3),
            sH=st.integers(1, 3), sW=st.integers(1, 3),
-           dH=st.integers(1, 2), dW=st.integers(1, 2),
-           prepacked=st.booleans())
-    def test_conv_api(self, Q, padH, padW, sH, sW, dH, dW, prepacked):
+           dH=st.integers(1, 1), dW=st.integers(1, 1))  # No dilation for quant!
+    def test_conv_api(self, Q, padH, padW, sH, sW, dH, dW):
         """Tests the correctness of the conv functional.
 
         The correctness is defined by the behavior being similar to the
@@ -82,16 +81,13 @@ class FunctionalAPITest(TestCase):
                 q_inputs, q_filters_ref, bias=q_bias,
                 scale=scale, zero_point=zero_point,
                 stride=stride, padding=i_padding, dilation=dilation,
-                groups=groups, prepacked=True, dtype=torch_type)
+                groups=groups, dtype=torch_type)
         else:
-            if prepacked:
-                q_filters = torch.ops.quantized.fbgemm_conv_prepack(q_filters,
-                                                                    groups)
             q_result = qF.conv2d(q_inputs, q_filters, bias=q_bias,
                                  scale=scale, zero_point=zero_point,
                                  stride=stride, padding=i_padding,
                                  dilation=dilation, groups=groups,
-                                 prepacked=prepacked, dtype=torch_type)
+                                 dtype=torch_type)
 
             np.testing.assert_equal(ref_result.int_repr().numpy(),
                                     q_result.int_repr().numpy())

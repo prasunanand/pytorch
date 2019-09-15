@@ -707,7 +707,7 @@ bool FunctionSignature::parse2(PyObject* args, PyObject* kwargs, PyObject* dst[]
     }
     return false;
   }
-
+  std::cout << "Didn't return false from FunctionSignature::parse2" << std::endl;
   return true;
 }
 
@@ -973,10 +973,6 @@ void PythonArgParser::print_error(PyObject* args, PyObject* kwargs, PyObject* pa
 //     }
 //     return -1;
 // }
-
-bool has_torch_function(){
-  return true;
-}
 
 at::Tensor PythonArgs::tensor_slow(int i) {
   std::cout << "called tensor_slow" << std::endl;

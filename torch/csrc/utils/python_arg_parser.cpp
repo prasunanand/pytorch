@@ -241,93 +241,17 @@ static PyObject* get_torch_function(PyObject* obj){
   return PyArray_LookupSpecial(obj, "__torch_function__");
 }
 
-bool FunctionParameter::check2(PyObject* obj, PyObject* args, PyObject* kwargs) {
-  std::cout << "in FunctionParameter::check2" << std::endl;
-  switch (type_) {
-    case ParameterType::TENSOR: {
-      if(THPVariable_Check_Subclass(obj)){
-        std::cout << "Check for subclass" << std::endl;
-      }
+bool FunctionParameter::check_has_torch_function(PyObject* obj) {
+  std::cout << "in FunctionParameter::check_has_torch_function" << std::endl;
 
-      PyObject* method = PyObject_GetAttrString(obj, "__torch_function__");
-      std::cout << "Check for torch function implementation" << std::endl;
-      PyObject *method_to_be_called;
-      if(method != NULL){
-        std::cout << "Found" << std::endl;
-        method_to_be_called = get_torch_function(obj);
-        // PyObject *implementation = PyObject_GetAttr(func, npy_ma_str_implementation);
-        // if (implementation == NULL) {
-        //   std::cout << "Implementation not Found" << std::endl;
-        //   return NULL;
-        // }
-        // result = PyObject_Call(implementation, args, kwargs);
-      }
-      else{
-        std::cout << "Not Found" << std::endl;
-      }
 
-      PyObject_CallFunctionObjArgs(obj, method_to_be_called, args, kwargs, NULL);
-
-      std::cout << "I got called!" << std::endl;
-      exit(0);
-      return THPVariable_Check(obj) || (allow_numbers_as_tensors && THPUtils_checkDouble(obj));
-    }
-    case ParameterType::SCALAR:
-      if (PyComplex_Check(obj)) {
-        return true;
-      }
-      // fallthrough
-    case ParameterType::DOUBLE: {
-      if (THPUtils_checkDouble(obj)) {
-        return true;
-      }
-      if (THPVariable_Check(obj)) {
-        auto& var = ((THPVariable*)obj)->cdata;
-        return !var.requires_grad() && var.dim() == 0;
-      }
-      return false;
-    }
-    case ParameterType::INT64: {
-      if (THPUtils_checkLong(obj)) {
-        return true;
-      }
-      if (THPVariable_Check(obj)) {
-        auto& var = ((THPVariable*)obj)->cdata;
-        return at::isIntegralType(var.scalar_type(), /*includeBool=*/false) && !var.requires_grad() && var.dim() == 0;
-      }
-      return false;
-    }
-#ifdef BUILD_NAMEDTENSOR
-    case ParameterType::DIMNAME: return THPUtils_checkDimname(obj);
-    case ParameterType::DIMNAME_LIST: {
-      if (THPUtils_checkDimnameList(obj)) {
-        return true;
-      }
-      // if a size is specified (e.g. DimnameList[1]) we also allow passing a single Dimname
-      return size == 1 && THPUtils_checkDimname(obj);
-    }
-#endif
-    case ParameterType::TENSOR_LIST: return six::isTuple(obj) || PyList_Check(obj);
-    case ParameterType::INT_LIST: {
-      if (PyTuple_Check(obj) || PyList_Check(obj)) {
-        return true;
-      }
-      // if a size is specified (e.g. IntArrayRef[2]) we also allow passing a single int
-      return size > 0 && THPUtils_checkLong(obj);
-    }
-    case ParameterType::GENERATOR: return THPGenerator_Check(obj);
-    case ParameterType::BOOL: return PyBool_Check(obj);
-    case ParameterType::STORAGE: return isStorage(obj);
-    case ParameterType::PYOBJECT: return true;
-    case ParameterType::SCALARTYPE: return THPDtype_Check(obj) || THPPythonScalarType_Check(obj);
-    case ParameterType::LAYOUT: return THPLayout_Check(obj);
-    case ParameterType::MEMORY_FORMAT: return THPMemoryFormat_Check(obj);
-    case ParameterType::QSCHEME: return THPQScheme_Check(obj);
-    case ParameterType::DEVICE:
-      return THPUtils_checkLong(obj) || THPUtils_checkString(obj) || THPDevice_Check(obj);
-    case ParameterType::STRING: return THPUtils_checkString(obj);
-    default: throw std::runtime_error("unknown parameter type");
+  std::cout << "Check for torch function implementation" << std::endl;
+  PyObject* method = PyObject_GetAttrString(obj, "__torch_function__");
+  if(method != NULL){
+    std::cout << "Found" << std::endl;
+    return true;
   }
+  return false;
 }
 
 
@@ -335,27 +259,6 @@ bool FunctionParameter::check(PyObject* obj) {
   std::cout << "in FunctionParameter::check" << std::endl;
   switch (type_) {
     case ParameterType::TENSOR: {
-      if(THPVariable_Check_Subclass(obj)){
-        std::cout << "Check for subclass" << std::endl;
-      }
-
-      PyObject* method = PyObject_GetAttrString(obj, "__torch_function__");
-      std::cout << "Check for torch function implementation" << std::endl;
-      if(method != NULL){
-        std::cout << "Found" << std::endl;
-        PyObject *method_to_be_called = get_torch_function(obj);
-        // PyObject *implementation = PyObject_GetAttr(func, npy_ma_str_implementation);
-        // if (implementation == NULL) {
-        //   std::cout << "Implementation not Found" << std::endl;
-        //   return NULL;
-        // }
-        // result = PyObject_Call(implementation, args, kwargs);
-      }
-      else{
-        std::cout << "Not Found" << std::endl;
-      }
-      // PyObject_CallFunctionObjArgs(method, argument, public_api, types, args, kwargs, NULL);
-
       return THPVariable_Check(obj) || (allow_numbers_as_tensors && THPUtils_checkDouble(obj));
     }
     case ParameterType::SCALAR:
@@ -756,7 +659,13 @@ bool FunctionSignature::parse2(PyObject* args, PyObject* kwargs, PyObject* dst[]
         missing_args(*this, i);
       }
       return false;
-    } else if (param.check2(obj, args, kwargs)) {
+    } else if (param.check(obj)) {
+      dst[i++] = obj;
+    // XXX: the Variable check is necessary because sizes become tensors when
+    // tracer is enabled. This behavior easily leads to ambiguities, and we
+    // should avoid having complex signatures that make use of it...
+    }
+    else if (param.check_has_torch_function(obj)) {
       dst[i++] = obj;
     // XXX: the Variable check is necessary because sizes become tensors when
     // tracer is enabled. This behavior easily leads to ambiguities, and we
@@ -806,7 +715,7 @@ bool FunctionSignature::parse2(PyObject* args, PyObject* kwargs, PyObject* dst[]
 
 bool FunctionSignature::parse(PyObject* args, PyObject* kwargs, PyObject* dst[],
                               bool raise_exception) {
-  std::cout << "FunctionSignature::parse, Trying to find out torch_Function" << std::endl;
+  std::cout << "FunctionSignature::parse old, Trying to find out torch_Function" << std::endl;
   auto nargs = PyTuple_GET_SIZE(args);
   std::cout << "nargs ->" << nargs << std::endl;
   ssize_t remaining_kwargs = kwargs ? PyDict_Size(kwargs) : 0;
@@ -947,7 +856,7 @@ PythonArgs PythonArgParser::raw_parse(PyObject* args, PyObject* kwargs, PyObject
 }
 
 PythonArgs PythonArgParser::raw_parse2(PyObject* args, PyObject* kwargs, PyObject* parsed_args[]) {
-  std::cout << "In PythonArgParser::raw_parse" << std::endl;
+  std::cout << "In PythonArgParser::raw_parse2" << std::endl;
   if (signatures_.size() == 1) {
     auto& signature = signatures_[0];
     signature.parse2(args, kwargs, parsed_args, true);
@@ -963,6 +872,7 @@ PythonArgs PythonArgParser::raw_parse2(PyObject* args, PyObject* kwargs, PyObjec
     }
     i++;
   }
+  std::cout << "Out of PythonArgParser::raw_parse2" << std::endl;
 
   print_error(args, kwargs, parsed_args);
 }
@@ -979,10 +889,7 @@ void PythonArgParser::print_error(PyObject* args, PyObject* kwargs, PyObject* pa
   }
 
   if (plausible_idxs.size() == 1) {
-  std::cout << "called tensor_slow" << std::endl;
-
-  std::cout << "called tensor_slow" << std::endl;
-
+  std::cout << "called print_errow" << std::endl;
     auto& signature = signatures_[plausible_idxs[0]];
     signature.parse(args, kwargs, parsed_args, true);
   }
@@ -996,6 +903,79 @@ void PythonArgParser::print_error(PyObject* args, PyObject* kwargs, PyObject* pa
 
   auto msg = torch::format_invalid_args(args, kwargs, function_name + "()", options);
   throw TypeError("%s", msg.c_str());
+}
+
+
+// static int
+// get_implementing_args_and_methods(PyObject *relevant_args,
+//                                   PyObject **implementing_args,
+//                                   PyObject **methods)
+// {
+//     int num_implementing_args = 0;
+//     Py_ssize_t i;
+//     int j;
+
+//     PyObject **items = PySequence_Fast_ITEMS(relevant_args);
+//     Py_ssize_t length = PySequence_Fast_GET_SIZE(relevant_args);
+
+//     for (i = 0; i < length; i++) {
+//         int new_class = 1;
+//         PyObject *argument = items[i];
+
+//         /* Have we seen this type before? */
+//         for (j = 0; j < num_implementing_args; j++) {
+//             if (Py_TYPE(argument) == Py_TYPE(implementing_args[j])) {
+//                 new_class = 0;
+//                 break;
+//             }
+//         }
+//         if (new_class) {
+//             PyObject *method = get_torch_function(argument);
+
+//             if (method != NULL) {
+//                 int arg_index;
+
+//                 if (num_implementing_args >= NPY_MAXARGS) {
+//                     PyErr_Format(
+//                         PyExc_TypeError,
+//                         "maximum number (%d) of distinct argument types " \
+//                         "implementing __torch_function__ exceeded",
+//                         NPY_MAXARGS);
+//                     Py_DECREF(method);
+//                     goto fail;
+//                 }
+
+//                 /* "subclasses before superclasses, otherwise left to right" */
+//                 arg_index = num_implementing_args;
+//                 for (j = 0; j < num_implementing_args; j++) {
+//                     PyObject *other_type;
+//                     other_type = (PyObject *)Py_TYPE(implementing_args[j]);
+//                     if (PyObject_IsInstance(argument, other_type)) {
+//                         arg_index = j;
+//                         break;
+//                     }
+//                 }
+//                 Py_INCREF(argument);
+//                 pyobject_array_insert(implementing_args, num_implementing_args,
+//                                       arg_index, argument);
+//                 pyobject_array_insert(methods, num_implementing_args,
+//                                       arg_index, method);
+//                 ++num_implementing_args;
+//             }
+//         }
+//     }
+//     return num_implementing_args;
+
+// fail:
+//     for (j = 0; j < num_implementing_args; j++) {
+//         Py_DECREF(implementing_args[j]);
+//         Py_DECREF(methods[j]);
+//     }
+//     return -1;
+// }
+
+bool has_torch_function(){
+  return true;
 }
 
 at::Tensor PythonArgs::tensor_slow(int i) {

@@ -125,6 +125,7 @@ struct PythonArgs {
   const FunctionSignature& signature;
   PyObject** args;
 
+  inline bool has_torch_function();
   inline at::Tensor tensor(int i);
   inline at::Scalar scalar(int i);
   inline at::Scalar scalarWithDefault(int i, at::Scalar default_scalar);
@@ -200,7 +201,7 @@ struct FunctionParameter {
   FunctionParameter(const std::string& fmt, bool keyword_only);
 
   bool check(PyObject* obj);
-  bool check2(PyObject* obj, PyObject* args, PyObject* kwargs);
+  bool check_has_torch_function(PyObject* obj);
 
   void set_default_str(const std::string& str);
   std::string type_name() const;

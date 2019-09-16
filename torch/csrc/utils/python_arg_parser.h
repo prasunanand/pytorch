@@ -126,6 +126,7 @@ struct PythonArgs {
   PyObject** args;
 
   inline bool has_torch_function();
+  inline std::string get_func_name();
   inline PyObject* get_overloaded_arg(int i);
   inline at::Tensor tensor(int i);
   inline at::Scalar scalar(int i);
@@ -241,6 +242,11 @@ inline PythonArgs PythonArgParser::parse(PyObject* args, PyObject* kwargs, Parse
 bool PythonArgs::has_torch_function(){
   return true;
 }
+
+inline std::string PythonArgs::get_func_name(){
+  return signature.name;
+}
+
 
 inline at::Tensor PythonArgs::tensor(int i) {
   if (args[i] && THPVariable_CheckExact(args[i])) {

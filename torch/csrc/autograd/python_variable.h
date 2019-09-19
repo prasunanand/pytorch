@@ -44,3 +44,31 @@ inline torch::autograd::Variable& THPVariable_Unpack(PyObject* obj) {
   auto var = (THPVariable*)obj;
   return var->cdata;
 }
+
+static PyObject * maybe_get_attr(PyObject *obj, char *name)
+{
+    PyTypeObject *tp = Py_TYPE(obj);
+    PyObject *res = (PyObject *)NULL;
+
+    /* Attribute referenced by (char *)name */
+    if (tp->tp_getattr != NULL) {
+        res = (*tp->tp_getattr)(obj, name);
+        if (res == NULL) {
+            PyErr_Clear();
+        }
+    }
+    /* Attribute referenced by (PyObject *)name */
+    else if (tp->tp_getattro != NULL) {
+        PyObject *w = PyUnicode_InternFromString(name);
+        if (w == NULL) {
+            return (PyObject *)NULL;
+        }
+        res = (*tp->tp_getattro)(obj, w);
+        Py_DECREF(w);
+        if (res == NULL) {
+            PyErr_Clear();
+        }
+    }
+    return res;
+}
+

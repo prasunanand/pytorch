@@ -51,15 +51,26 @@ PY_VARIABLE_METHOD_VARARGS = CodeTemplate("""\
 static PyObject * ${pycname}(PyObject* self_, PyObject* args, PyObject* kwargs)
 {
   HANDLE_TH_ERRORS
-  std::cout << "hello world!" << std::endl;
   static PythonArgParser parser({
     ${signatures}
   }, /*traceable=*/${traceable});
   ${unpack_self}
   ParsedArgs<${max_args}> parsed_args;
-  auto r = parser.parse(args, kwargs, parsed_args);
-  ${declare_namedtuple_return_types}
-  ${dispatch}
+  auto r = parser.parse2(args, kwargs, parsed_args);
+  std::cout << "parsed and got r" << std::endl;
+
+  if(r.has_torch_function()){
+    //
+    std::cout << "Found torch_function" << std::endl;
+    PyObject* torch_function = maybe_get_attr(r.get_overloaded_arg(0), "__torch_function__");
+    return PyObject_CallFunctionObjArgs(torch_function, PyUnicode_FromString(r.get_func_name().data()), args, kwargs, NULL);
+
+  }
+  else{
+    std::cout << "Not found torch_function" << std::endl;
+    ${declare_namedtuple_return_types}
+    ${dispatch}
+  }
   Py_RETURN_NONE;
   END_HANDLE_TH_ERRORS
 }

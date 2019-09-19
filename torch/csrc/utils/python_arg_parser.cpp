@@ -174,34 +174,6 @@ _is_basic_python_type(PyTypeObject *tp)
     );
 }
 
-static PyObject * maybe_get_attr(PyObject *obj, char *name)
-{
-    PyTypeObject *tp = Py_TYPE(obj);
-    PyObject *res = (PyObject *)NULL;
-
-    /* Attribute referenced by (char *)name */
-    if (tp->tp_getattr != NULL) {
-        res = (*tp->tp_getattr)(obj, name);
-        if (res == NULL) {
-            PyErr_Clear();
-        }
-    }
-    /* Attribute referenced by (PyObject *)name */
-    else if (tp->tp_getattro != NULL) {
-        PyObject *w = PyUnicode_InternFromString(name);
-        if (w == NULL) {
-            return (PyObject *)NULL;
-        }
-        res = (*tp->tp_getattro)(obj, w);
-        Py_DECREF(w);
-        if (res == NULL) {
-            PyErr_Clear();
-        }
-    }
-    return res;
-}
-
-
 static PyObject* get_tensor_torch_function(void){
   std::cout << "Called get_tensor_torch_function()" << std::endl;
   PyObject* method = PyObject_GetAttrString((PyObject*)THPVariableClass, "__torch_function__");

@@ -4231,6 +4231,7 @@
     CPU: ne_out
     CUDA: ne_out
     QuantizedCPU: ne_out_quantized_cpu
+    SparseCUDA: ne_out_sparse_cuda
 
 - func: ne.Scalar(Tensor self, Scalar other) -> Tensor
   supports_named_tensor: True
@@ -4240,6 +4241,7 @@
     CPU: ne
     CUDA: ne
     QuantizedCPU: ne_quantized_cpu
+    SparseCUDA: ne_out_sparse_cuda
 
 - func: ne.Tensor_out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
   supports_named_tensor: True
@@ -4247,6 +4249,7 @@
     CPU: ne_out
     CUDA: ne_out
     QuantizedCPU: ne_out_quantized_cpu
+    SparseCUDA: ne_out_sparse_cuda
 
 - func: ne.Tensor(Tensor self, Tensor other) -> Tensor
   supports_named_tensor: True
@@ -4256,6 +4259,7 @@
     CPU: ne
     CUDA: ne
     QuantizedCPU: ne_quantized_cpu
+    SparseCUDA: ne_sparse_cuda
 
 - func: eq.Scalar_out(Tensor self, Scalar other, *, Tensor(a!) out) -> Tensor(a!)
   supports_named_tensor: True

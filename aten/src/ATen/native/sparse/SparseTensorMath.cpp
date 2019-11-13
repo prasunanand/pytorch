@@ -1174,4 +1174,37 @@ Tensor _sparse_sum_backward_cpu(const Tensor& grad_, const SparseTensor& input_,
   }
 }
 
+// SparseTensor ne
+SparseTensor & ne_out_sparse_cuda(SparseTensor & out, const SparseTensor & self, Scalar other){
+  return ne_out_sparse_cuda(out, self, wrapped_scalar_tensor(other));
+}
+
+SparseTensor ne_out_sparse_cuda(const SparseTensor & self, Scalar other){
+  SparseTensor out = at::empty({0}, self.options().dtype(at::kBool));
+  ne_out_sparse_cuda(out, self, wrapped_scalar_tensor(other));
+  return out;
+}
+
+SparseTensor & ne_out_sparse_cuda(SparseTensor & out, const SparseTensor & self, const SparseTensor & other){
+  AT_ASSERT(out.is_sparse());
+  AT_ASSERT(self.is_sparse());
+
+  out.resize_as_(self);
+  auto indices = self._indices();
+  indices.resize_as_(self._indices());
+  indices.copy_(self._indices());
+  Tensor out_values = out._values();
+  at::ne_out(out_values, self._values(), other._values());
+  get_sparse_impl(out)->set_nnz_and_narrow(self._nnz()); // error
+
+  out._coalesced_(self.is_coalesced());
+  return out;
+}
+
+SparseTensor ne_sparse_cuda(const SparseTensor & self, const SparseTensor & other){
+  SparseTensor out = at::empty({0}, self.options().dtype(at::kBool));
+  ne_out_sparse_cuda(out, self, other);
+  return out;
+}
+
 }} // namespace at::native
